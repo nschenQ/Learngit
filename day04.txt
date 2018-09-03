@@ -1,0 +1,332 @@
+Day03回顾
+1、SQL命令运行时间检测
+  1、开启 ：mysql> set profiling=1;
+  2、查看 ：mysql> show profiles;
+  3、关闭 ：mysql> set profiling=0;
+2、索引(BTREE)
+  1、优点 ：加快数据的检索速度
+  2、缺点 ：
+    1、占用物理存储空间
+    2、需要动态维护,占用系统资源,降低数据维护速度
+3、分类
+  1、普通(MUL)、唯一(UNI,字段值不允许重复,可为NULL)
+    1、创建
+      index(字段名),index(字段名)...
+      unique(字段名),unique(字段名)...
+      create [unique] index 索引名 on 表名(字段名);
+    2、查看
+      desc;
+      show index from 表名;
+        Non_Unique : 1  --> index
+	Non_Unique : 0  --> unique
+    3、删除
+      drop index 索引名 on 表名;  (只能一个一个删)
+  2、主键&&自增长属性(PRI,不允许重复,不允许为NULL)
+    1、创建
+      id int primary key auto_increment,
+      alter table 表名 add primary key(字段名);
+    2、删除
+      1、先删除自增长(modify)
+        alter table 表名 modify id int;
+      2、再删除主键
+        alter table 表名 drop primary key;
+    3、指定起始值
+      1、create table ...)auto_increment=1000;
+      2、alter table 表名 auto_increment=1000;
+4、数据导入
+  1、步骤
+    1、创建对应的表
+    2、拷贝文件到数据库搜索路径
+      show variables like "%secure%";
+      sudo cp 源文件 /var/lib/mysql-files/
+    3、执行导入语句
+      load data infile "绝对路径/文件名"
+      into table 库名.表名
+      fields terminated by "分隔符"
+      lines terminated by "\n";
+  2、查看文件权限
+    ls -l 文件名
+    chmod 644 文件名
+    chmod 666 文件名
+4、数据导出
+  1、查看搜索路径
+    show varibales like "secure_file_priv";
+  2、执行导出语句
+    select ... from 表名 where 条件
+    into outfile "绝对路径/文件名"
+    fields terminated by "分隔符"
+    lines terminated by "\n";
+5、表的复制
+  1、create table 表名 select ... from 表名 where 条件/false;
+*********************************
+Day04笔记
+1、外键(foreign key)
+  1、定义 ：让当前表的字段值在另一张表的范围内去选择
+  2、语法格式
+    foreign key(参考字段名)
+    references 主表(被参考字段名)
+    on delete 级联动作
+    on update 级联动作;
+  3、使用规则
+    1、主表、从表字段数据类型要一致
+    2、主表 ：被参考字段是主键
+  4、示例
+    1、表1：缴费信息表(财务) :jftab
+           id  姓名    班级  缴费金额
+	    1  唐伯虎  AID07    300
+	    2  点秋香  AID07    300
+
+       表2：学生信息表(班主任) :bjtab
+           stu_id  姓名   缴费金额
+
+    2、创建表 
+      表1 ：jftab
+        create table jftab(
+	id int primary key,
+	name varchar(20) not null,
+	class char(5),
+	money smallint
+	)character set utf8;
+
+	insert into jftab values
+	(1,"唐伯虎","AID07",300),
+	(2,"点秋香","AID07",300),
+	(3,"文征明","AID07",300);
+
+      表2 ：bjtab
+        create table bjtab(
+	stu_id int,
+	name varchar(20),
+	money smallint,
+	foreign key(stu_id) references jftab(id)
+	on delete cascade
+	on update cascade
+	)character set utf8;
+    3、删除外键
+      alter table 表名 drop foreign key 外键名;
+      外键名查看 ：show create table 表名;
+    4、已有表添加外键
+      alter table 表名 add 
+      foreign key(stu_id) references jftab(id)
+      on delete 级联动作
+      on update 级联动作;
+    5、级联动作
+      1、cascade 
+        数据级联删除,级联更新(参考字段)
+      2、restrict(默认)
+        从表中有相关联记录,不允许主表操作
+      3、set null
+        主表删除、更新,从表相关联记录字段值为NULL
+2、嵌套查询(子查询)
+  1、定义 ：把内层的查询结果作为外层的查询条件
+  2、语法
+    select ... from 表名 where 字段名 运算符 (select ... from 表名 where 条件);
+  3、练习
+    1、把攻击值小于平均攻击值的名字和攻击值显示出来
+      1、先求平均值
+        select avg(gongji) from sanguo;
+      2、找结果
+        select name,gongji from sanguo where gongji<值;
+
+      select name,gongji from sanguo where 
+      gongji<(select avg(gongji) from sanguo);
+    2、找出每个国家攻击力最高的英雄的名字和攻击值
+      # 有问题语句
+      select name,gongji from sanguo
+      where
+      gongji in(select max(gongji) from sanguo group by country);
+      # 无问题语句
+      select name,gongji from sanguo
+      where
+      (country,gongji) in(select country,max(gongji) from sanguo group by country);
+3、多表查询
+  1、两种方式
+    1、笛卡尔积 ：不加where条件
+      select ... from 表1,表2;
+    2、加where条件
+      select ... from 表1,表2 where 条件;
+    3、
+      1、记录多的表的每一条记录,去匹配另一张表的所有记录
+      2、2张表记录条数相同,则后表的每一条记录去匹配前表的所有记录
+  2、练习
+    1、显示 省、市详细信息
+      河北省   石家庄市
+      河北省   廊坊市
+      广东省   广州市
+      广东省   深圳市
+      select sheng.s_name,city.c_name from sheng,city where 
+      sheng.s_id=city.cfather_id;
+    2、显示省、市、县详细信息
+      select sheng.s_name,city.c_name,xian.x_name from 
+      sheng,city,xian
+      where
+      sheng.s_id=city.cfather_id and city.c_id=xian.xfather_id;
+4、连接查询
+  1、内连接(inner join)
+    1、语法格式
+      select 字段名列表 from 表1
+      inner join 表2 on 条件
+      inner join 表3 on 条件;
+    2、练习
+      1、显示省、市详细信息(只显示匹配到的)
+        select sheng.s_name,city.c_name from sheng 
+        inner join city
+        on sheng.s_id=city.cfather_id;
+      2、显示省市县详细信息
+        select sheng.s_name,city.c_name,xian.x_name from sheng
+        inner join city on sheng.s_id=city.cfather_id
+        inner join xian on city.c_id=xian.x_father_id;
+  2、外连接
+    1、左连接(left join)
+      1、以 左表为主 显示查询结果
+      2、select 字段名列表 from 表1
+         left join 表2 on 条件
+	 left join 表3 on 条件;
+      3、练习
+        1、显示省、市详细信息,要求省全部显示
+	
+	2、显示省市县详细信息,要求省全部显示
+	  select sheng.s_name,city.c_name,xian.x_name from sheng
+          left join city on sheng.s_id=city.cfather_id
+          left join xian on city.c_id=xian.xfather_id;
+    2、右连接(right join)
+      以右表为主显示查询结果,用法同左连接
+5、锁
+  1、目的 ：解决客户端并发访问的冲突问题
+  2、锁分类
+    1、锁类型 
+      1、读锁(共享锁)
+        查询(select):加读锁之后,别人不能更改表记录,但可以进行查询
+      2、写锁(互斥锁、排他锁)
+        更新(update):加写锁之后别人不能查、不能改
+
+    2、锁粒度
+      1、行级锁 ：Innodb
+        select ：加读锁,锁1行
+	update ：加写锁,锁1行
+      2、表级锁 ：MyISAM
+        select ：加读锁,锁1张表
+	update ：加写锁,锁1张表
+6、存储引擎(engine ：处理表的处理器)
+  1、基本操作命令
+    1、查看所有存储引擎
+      show engines;
+    2、查看已有表的存储引擎
+      show create table 表名;
+    3、创建表指定存储引擎
+      create table 表名(...)engine=myisam,charset=utf8;
+    4、已有表
+      alter table 表名 engine=myisam;
+  2、常用存储引擎的特点
+    1、InnoDB特点
+      1、支持事务、外键、行级锁
+      2、共享表空间
+        表名.frm ：表结构和索引信息  
+	表名.ibd : 表记录
+    2、MyISAM特点
+      1、支持表级锁
+      2、独享表空间
+        表名.frm ：表结构
+	表名.MYD ：表记录
+	表名.MYI ：索引信息
+    3、Memory存储引擎
+      1、数据存储在内存中,速度快
+      2、服务器重启、MySQL服务重启后表记录消失
+  3、如何决定使用哪个存储引擎
+    1、查询操作多的表使用MyISAM(使用InnoDB浪费资源)
+    2、写操作多的表使用InnoDB
+7、MySQL用户账户管理
+  1、开启MySQL远程连接(改配置文件)
+    1、sudo -i
+    2、cd /etc/mysql/mysql.conf.d/
+    3、cp mysqld.cnf mysqld.cnf.bak2
+    4、vi mysqld.cnf
+      #bind-address=127.0.0.1
+      把前面 # 去掉,保存退出
+      vi mysqld.cnf
+      按a -> 改内容 -> 按ESC -> 按 shift + : -> wq
+    5、/etc/init.d/mysql restart
+  2、用root用户添加授权用户
+    1、用root用户登录mysql
+      mysql -uroot -p123456
+    2、授权
+      grant 权限列表 on 库名.表名 
+      to "用户名"@"%" identified by "密码"
+      with grant option;
+      权限列表 ：all privileges、select、update
+      库名.表名 ：db4.* 、*.*(所有库的所有表)
+    3、示例
+      1、添加授权用户tiger,密码123,对所有库的所有表有所有权限,可从任何IP去连接
+        grant all privileges on *.* 
+        to "tiger"@"%"
+        identified by "123"
+        with grant option;
+      2、添加授权用户rabbit,密码123,对db4库所有表只有查询权限,可从任何IP去连接
+        grant select on db4.* 
+        to "rabbit"@"%" identified by "123"
+        with grant option;
+8、作业讲解
+  1、/etc/passwd 导入到数据库表中
+     tarena:x:1000:1000:tarena,,,:/home/tarena:/bin/bash
+    1、创建对应的表
+      create table userinfo(
+      username varchar(20),
+      password char(1),
+      uid int,
+      gid int,
+      comment varchar(50),
+      homedir varchar(50),
+      shell varchar(50)
+      );
+    2、复制文件到 /var/lib/mysql-files/
+      sudo cp /etc/passwd /var/lib/mysql-files/
+    3、输入导入语句
+      load data infile "/var/lib/mysql-files/passwd"
+      into table db4.userinfo
+      fields terminated by ":"
+      lines terminated by "\n";
+  2、在userinfo表中第一列添加id字段,主键、自增长、显示宽度为3,位数不够用0填充
+    alter table userinfo add 
+    id int(3) zerofill primary key auto_increment first;
+    
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+	     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
